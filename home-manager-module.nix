@@ -25,7 +25,9 @@ self:
     };
 
     home = {
-      packages =
+      packages = [
+          self.packages.${pkgs.stdenv.system}.nix-index-with-db
+        ] ++
         lib.optional config.programs.nix-index-database.comma.enable
           self.packages.${pkgs.stdenv.system}.comma-with-db;
 
