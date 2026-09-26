@@ -15,8 +15,6 @@
               imports = [
                 nixIndexModule
                 {
-                  programs.command-not-found.enable = false;
-
                   programs.nix-index-database.comma.enable = true;
                   # Point comma at our nixpkgs instance.
                   # Passing --nixpkgs-flake instead seems to fail when nix tries to use the network.
@@ -32,7 +30,7 @@
 
           # Check that nix-locate works
           node1.succeed(" | ".join([
-            "nix-locate --top-level --whole-name --at-root '/bin/rg'",
+            "nix-locate --whole-name --at-root '/bin/rg'",
             "cut -d' ' -f1",
             "grep -F 'ripgrep.out'"
           ]))

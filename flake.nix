@@ -14,31 +14,10 @@
       ];
 
       systems = testSystems ++ [
-        "x86_64-darwin"
         "aarch64-darwin"
       ];
 
-      mkPackages =
-        pkgs:
-        let
-          generated = import ./generated.nix;
-
-          nix-index-database =
-            (pkgs.fetchurl {
-              url = generated.url + pkgs.stdenv.system;
-              hash = generated.hashes.${pkgs.stdenv.system};
-            }).overrideAttrs
-              {
-                __structuredAttrs = true;
-                unsafeDiscardReferences.out = true;
-              };
-        in
-        {
-          inherit nix-index-database;
-
-          nix-index-with-db = pkgs.callPackage ./nix-index-wrapper.nix { inherit nix-index-database; };
-          comma-with-db = pkgs.callPackage ./comma-wrapper.nix { inherit nix-index-database; };
-        };
+      mkPackages = pkgs: import ./default.nix { inherit pkgs; };
     in
     {
       packages = lib.genAttrs systems (
@@ -62,11 +41,22 @@
 
       overlays.nix-index = final: _prev: mkPackages final;
 
-      darwinModules.nix-index = import ./darwin-module.nix self;
+      darwinModules = {
+        default = self.darwinModules.nix-index;
+        nix-index = ./darwin-module.nix;
+      };
 
-      hmModules.nix-index = import ./home-manager-module.nix self;
+      hmModules.nix-index = lib.warn "nix-index-database: flake output `hmModules` has been renamed to `homeModules`" ./home-manager-module.nix;
 
-      nixosModules.nix-index = import ./nixos-module.nix self;
+      homeModules = {
+        default = self.homeModules.nix-index;
+        nix-index = ./home-manager-module.nix;
+      };
+
+      nixosModules = {
+        default = self.nixosModules.nix-index;
+        nix-index = ./nixos-module.nix;
+      };
 
       checks = lib.genAttrs testSystems (
         system:

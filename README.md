@@ -1,6 +1,6 @@
 # nix-index-database
 
-Weekly updated [nix-index](https://github.com/bennofs/nix-index) database
+Weekly updated [nix-index](https://github.com/nix-community/nix-index) database for nixos-unstable channel.
 
 This repository also provides nixos modules and home-manager modules that add a
 `nix-index` wrapper to use the database from this repository.
@@ -15,13 +15,30 @@ $ nix run github:nix-community/nix-index-database bin/cntr
 cntr.out                                        978,736 x /nix/store/09p2hys5bxcnzcaad3bknlnwsgdkznl1-cntr-1.5.1/bin/cntr
 ```
 
+## Database Variants
+
+This project provides two database variants:
+
+- **Full (Default)**: Contains all indexed files (including headers, libraries, etc…). It is packaged as `nix-index-with-db`.
+- **Small**: Contains only files under `/bin/` directories (filtered database). It is much smaller, downloads faster, and consumes less memory. It is packaged as `nix-index-with-small-db` (and [comma](https://github.com/nix-community/nix-index-database/blob/f8ed6cdcb1fd28a6ab7b61f4467a4f67fe2d9074/default.nix#L33-L35)).
+
+To switch to the small database, override the `nix-index` package in your configuration:
+
+```nix
+programs.nix-index.package = nix-index-database.packages.${pkgs.stdenv.hostPlatform.system}.nix-index-with-small-db;
+```
+
 ## Requirements
 
 - Nix 2.18 or newer: In our packages we make use of `unsafeDiscardReferences` to skip the nix store checks. On older nix version these packages might fail.
 
 ## Usage in NixOS
 
-Include the nixos module in your configuration (requires 23.05 or nixos unstable)
+Include the nixos module in your configuration:
+
+> [!IMPORTANT]
+> When using this module do not also include `nix-index` in your environment.systemPackages list as this
+> will conflict with the nix-index wrapper provided by this project.
 
 ```nix
 {
@@ -38,7 +55,7 @@ Include the nixos module in your configuration (requires 23.05 or nixos unstable
         system = "x86_64-linux";
         modules = [
           ./configuration.nix
-          nix-index-database.nixosModules.nix-index
+          nix-index-database.nixosModules.default
           # optional to also wrap and install comma
           # { programs.nix-index-database.comma.enable = true; }
         ];
@@ -50,10 +67,44 @@ Include the nixos module in your configuration (requires 23.05 or nixos unstable
 
 You can then call `nix-locate` as usual, it will automatically use the database provided by this repository.
 
+## Usage in nix-darwin
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable-small";
+    nix-darwin.url = "github:LnL7/nix-darwin/master";
+    nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
+
+    nix-index-database.url = "github:nix-community/nix-index-database";
+    nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
+  };
+
+  outputs = { self, nixpkgs, nix-index-database, ... }: {
+    darwinConfigurations = {
+      my-machine = nix-darwin.lib.darwinSystem {
+        modules = [
+          ./configuration.nix
+          nix-index-database.darwinModules.nix-index
+          # optional, this is the default
+          # { programs.nix-index-database.enable = true; }
+          # optional to also wrap and install comma
+          # { programs.nix-index-database.comma.enable = true; }
+        ];
+      };
+    };
+  };
+}
+```
+
 ## Usage in Home-manager
 
-1. Follow the [manual](https://github.com/nix-community/home-manager/blob/master/docs/nix-flakes.adoc) to set up home-manager with flakes.
+1. Follow the [manual](https://nix-community.github.io/home-manager/index.xhtml#ch-nix-flakes) to set up home-manager with flakes.
 2. Include the home-manager module in your configuration:
+
+> [!IMPORTANT]
+> When using this module do not also include `nix-index` in your home.packages list as this
+> will conflict with the nix-index wrapper provided by this project.
 
 ```nix
 {
@@ -77,7 +128,7 @@ You can then call `nix-locate` as usual, it will automatically use the database 
         inherit pkgs;
 
         modules = [
-          nix-index-database.hmModules.nix-index
+          nix-index-database.homeModules.default
           # optional to also wrap and install comma
           # { programs.nix-index-database.comma.enable = true; }
         ];
@@ -100,7 +151,6 @@ setting `programs.nix-index.enable = true`.
 download_nixpkgs_cache_index () {
   filename="index-$(uname -m | sed 's/^arm64$/aarch64/')-$(uname | tr A-Z a-z)"
   mkdir -p ~/.cache/nix-index && cd ~/.cache/nix-index
-  # -N will only download a new version if there is an update.
   wget -q -N https://github.com/nix-community/nix-index-database/releases/latest/download/$filename
   ln -f $filename files
 }

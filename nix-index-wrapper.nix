@@ -1,27 +1,29 @@
 {
-  lib,
+  linkFarm,
   symlinkJoin,
   makeBinaryWrapper,
   nix-index-unwrapped,
   nix-index-database,
+  db-type ? "full",
 }:
 symlinkJoin {
-  name = "nix-index-with-db-${nix-index-unwrapped.version}";
+  name = "nix-index-with-${db-type}-db-${nix-index-unwrapped.version}";
   paths = [ nix-index-unwrapped ];
   nativeBuildInputs = [ makeBinaryWrapper ];
+  databaseDirectory = linkFarm "nix-index-database" { files = nix-index-database; };
   postBuild = ''
-    mkdir -p $out/share/cache/nix-index
-    ln -s ${nix-index-database} $out/share/cache/nix-index/files
-
     wrapProgram $out/bin/nix-locate \
-      --set NIX_INDEX_DATABASE $out/share/cache/nix-index
+      --set NIX_INDEX_DATABASE $databaseDirectory
 
     mkdir -p $out/etc/profile.d
-    rm -f "$out/etc/profile.d/command-not-found.sh"
-    substitute \
-     "${nix-index-unwrapped}/etc/profile.d/command-not-found.sh" \
-     "$out/etc/profile.d/command-not-found.sh" \
-     --replace-fail "${nix-index-unwrapped}" "$out"
+    cd $out
+    for script in etc/profile.d/command-not-found.*; do
+      rm -f "$out/$script"
+      substitute \
+       "${nix-index-unwrapped}/$script" \
+       "$out/$script" \
+       --replace-fail "${nix-index-unwrapped}" "$out"
+    done
   '';
 
   meta.mainProgram = "nix-locate";
